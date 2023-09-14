@@ -22,6 +22,8 @@ IN THE SOFTWARE.
 
 ***/
 
+#pragma once
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <cuda.h>
@@ -62,7 +64,6 @@ bool        cgbn_error_report_check(cgbn_error_report_t *report);
 void        cgbn_error_report_reset(cgbn_error_report_t *report);
 const char *cgbn_error_string(cgbn_error_report_t *report);
 
-#include "cgbn.cu"
 
 #if defined(__CUDA_ARCH__)
   #if !defined(XMP_IMAD) && !defined(XMP_XMAD) && !defined(XMP_WMAD)

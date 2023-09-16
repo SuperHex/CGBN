@@ -3,11 +3,13 @@
 #include <gmp.h>
 #include <gmpxx.h>
 #include <cuda.h>
+#include <cuda_runtime_api.h>
 #include <cgbn/cgbn.h>
 
-inline constexpr size_t TPI  = 4;
-inline constexpr size_t TPB  = 256;
-inline constexpr size_t BITS = 256;
+inline constexpr size_t cuNTT_TPI  = 4;
+inline constexpr size_t cuNTT_TPB  = 256;
+inline constexpr size_t cuNTT_BITS = 256;
+inline constexpr size_t cuNTT_LIMBS = (cuNTT_BITS + 31) / 32;
 
 void cuda_check(cudaError_t status,
                 const char *action = nullptr,
@@ -21,14 +23,14 @@ void cgbn_check(cgbn_error_report_t *report,
 #define CUDA_CHECK(action) cuda_check(action, #action, __FILE__, __LINE__)
 #define CGBN_CHECK(report) cgbn_check(report, __FILE__, __LINE__)
 
+namespace cuNTT {
+
 using report_error_t = cgbn_error_report_t;
-using device_mem_t = cgbn_mem_t<BITS>;
-using context_t = cgbn_context_t<TPI>;
-using env_t = cgbn_env_t<context_t, BITS>;
+using device_mem_t = cgbn_mem_t<cuNTT_BITS>;
+using context_t = cgbn_context_t<cuNTT_TPI>;
+using env_t = cgbn_env_t<context_t, cuNTT_BITS>;
 using num_t = typename env_t::cgbn_t;
 using wide_num_t = typename env_t::cgbn_wide_t;
-
-namespace cuNTT {
 
 void to_mpz(mpz_class& r, const device_mem_t &x, uint32_t count);
 void from_mpz(device_mem_t &x, const mpz_class& s, uint32_t count);

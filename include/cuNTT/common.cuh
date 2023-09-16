@@ -1,5 +1,7 @@
 #pragma once
 
+namespace cuNTT {
+
 __constant__ device_mem_t gpu_J;
 __constant__ device_mem_t gpu_p, gpu_2p, gpu_4p, gpu_8p;
 
@@ -36,7 +38,7 @@ __device__ uint32_t radix_bit_reverse(uint32_t x, uint32_t bits) {
     return x >> (32 - bits);
 }
 
-namespace cuNTT::kernel {
+namespace kernel {
 
 template <size_t radix>
 __global__ void
@@ -72,10 +74,10 @@ reduce_mod(report_error_t *err, device_mem_t * input, int N) {
     num_t x, factor;
     
     for (int curr_thread = blockDim.x * blockIdx.x + threadIdx.x;
-         curr_thread < N * TPI;
+         curr_thread < N * cuNTT_TPI;
          curr_thread += blockDim.x * gridDim.x)
     {
-        const int instance = (blockIdx.y * N) + curr_thread / TPI;
+        const int instance = (blockIdx.y * N) + curr_thread / cuNTT_TPI;
 
         env.load(x, &input[instance]);
 
@@ -118,10 +120,10 @@ adjust_inverse(report_error_t *err, device_mem_t *in, device_mem_t gpu_N_inv, in
     env.load(N_inv, &gpu_N_inv);
     
     for (int curr_thread = blockDim.x * blockIdx.x + threadIdx.x;
-         curr_thread < N * TPI;
+         curr_thread < N * cuNTT_TPI;
          curr_thread += blockDim.x * gridDim.x)
     {
-        const int instance = (blockIdx.y * N) + curr_thread / TPI;
+        const int instance = (blockIdx.y * N) + curr_thread / cuNTT_TPI;
 
         env.load(x, &in[instance]);
         montgomery_mul(env, x, x, N_inv, p, J);
@@ -145,10 +147,10 @@ precompute_omega_table(report_error_t *err,
     env.load(p, &gpu_p);
     
     for (int curr_thread = blockDim.x * blockIdx.x + threadIdx.x;
-         curr_thread < N * TPI;
+         curr_thread < N * cuNTT_TPI;
          curr_thread += blockDim.x * gridDim.x)
     {
-        const int instance = curr_thread / TPI;
+        const int instance = curr_thread / cuNTT_TPI;
 
         env.load(x, &root_of_unity);
         env.set_ui32(pow, instance);
@@ -163,4 +165,5 @@ precompute_omega_table(report_error_t *err,
     }    
 }
 
-}  // namespace cuNTT::kernel
+}  // namespace kernel
+}  // namespace cuNTT

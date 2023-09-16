@@ -44,10 +44,10 @@ radix4_DIF_butterfly(report_error_t *err,
     env.load(J, &gpu_J);    
 
     for (int curr_thread = blockDim.x * blockIdx.x + threadIdx.x;
-         curr_thread < N * TPI / 4;
+         curr_thread < N * cuNTT_TPI / 4;
          curr_thread += blockDim.x * gridDim.x)
     {
-        const int instance = curr_thread / TPI;   // instance is the true `i` for [0, N/4)
+        const int instance = curr_thread / cuNTT_TPI;   // instance is the true `i` for [0, N/4)
         const int omega_stride = N / M;
         const int fft_group = instance / M4;
         const int fft_M_index = instance % M4;
@@ -133,11 +133,11 @@ radix4_DIT_butterfly(report_error_t *err,
     env.load(J, &gpu_J);
     
     for (int curr_thread = blockDim.x * blockIdx.x + threadIdx.x;
-         curr_thread < N * TPI / 4;
+         curr_thread < N * cuNTT_TPI / 4;
          curr_thread += blockDim.x * gridDim.x)
     {
         // const int thread_pos = threadIdx.x + blockDim.x * blockIdx.x;
-        const int instance = curr_thread / TPI;
+        const int instance = curr_thread / cuNTT_TPI;
         const int omega_stride = N / M;
         const int fft_group = instance / M4;
         const int fft_M_index = instance % M4;

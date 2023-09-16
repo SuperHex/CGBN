@@ -16,10 +16,10 @@ EltwiseAddMod(device_mem_t *out,
     env.load(b, &modulus);
     
     for (int curr_thread = blockDim.x * blockIdx.x + threadIdx.x;
-         curr_thread < N * TPI;
+         curr_thread < N * cuNTT_TPI;
          curr_thread += blockDim.x * gridDim.x)
     {
-        const int instance = curr_thread / TPI;
+        const int instance = curr_thread / cuNTT_TPI;
         
         env.load(a, &x[instance]);
         env.load(b, &y[instance]);
@@ -50,10 +50,10 @@ EltwiseAddMod(device_mem_t *out,
     env.load(p, &modulus);
     
     for (int curr_thread = blockDim.x * blockIdx.x + threadIdx.x;
-         curr_thread < N * TPI;
+         curr_thread < N * cuNTT_TPI;
          curr_thread += blockDim.x * gridDim.x)
     {
-        const int instance = curr_thread / TPI;
+        const int instance = curr_thread / cuNTT_TPI;
         
         env.load(a, &x[instance]);
         env.add(a, a, s);
@@ -81,10 +81,10 @@ EltwiseSubMod(device_mem_t *out,
     env.load(p, &modulus);
     
     for (int curr_thread = blockDim.x * blockIdx.x + threadIdx.x;
-         curr_thread < N * TPI;
+         curr_thread < N * cuNTT_TPI;
          curr_thread += blockDim.x * gridDim.x)
     {
-        const int instance = curr_thread / TPI;
+        const int instance = curr_thread / cuNTT_TPI;
         
         env.load(a, &x[instance]);
         env.load(b, &y[instance]);
@@ -116,10 +116,10 @@ EltwiseSubMod(device_mem_t *out,
     env.load(p, &modulus);
     
     for (int curr_thread = blockDim.x * blockIdx.x + threadIdx.x;
-         curr_thread < N * TPI;
+         curr_thread < N * cuNTT_TPI;
          curr_thread += blockDim.x * gridDim.x)
     {
-        const int instance = curr_thread / TPI;
+        const int instance = curr_thread / cuNTT_TPI;
         
         env.load(a, &x[instance]);
         
@@ -150,10 +150,10 @@ EltwiseMultMod(device_mem_t *out,
     env.load(p, &modulus);
     
     for (int curr_thread = blockDim.x * blockIdx.x + threadIdx.x;
-         curr_thread < N * TPI;
+         curr_thread < N * cuNTT_TPI;
          curr_thread += blockDim.x * gridDim.x)
     {
-        const int instance = curr_thread / TPI;
+        const int instance = curr_thread / cuNTT_TPI;
         
         env.load(a, &x[instance]);
         env.load(b, &y[instance]);
@@ -181,10 +181,10 @@ EltwiseMultMod(device_mem_t *out,
     env.load(p, &modulus);
     
     for (int curr_thread = blockDim.x * blockIdx.x + threadIdx.x;
-         curr_thread < N * TPI;
+         curr_thread < N * cuNTT_TPI;
          curr_thread += blockDim.x * gridDim.x)
     {
-        const int instance = curr_thread / TPI;
+        const int instance = curr_thread / cuNTT_TPI;
         
         env.load(a, &x[instance]);
 
@@ -213,10 +213,10 @@ EltwiseFMAMod(device_mem_t *out,
     env.load(p, &modulus);
     
     for (int curr_thread = blockDim.x * blockIdx.x + threadIdx.x;
-         curr_thread < N * TPI;
+         curr_thread < N * cuNTT_TPI;
          curr_thread += blockDim.x * gridDim.x)
     {
-        const int instance = curr_thread / TPI;
+        const int instance = curr_thread / cuNTT_TPI;
         
         env.load(a, &x[instance]);
         env.load(b, &y[instance]);

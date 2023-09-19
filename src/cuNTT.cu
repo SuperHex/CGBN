@@ -75,11 +75,11 @@ void from_mpz(device_mem_t &x, const mpz_class& s, uint32_t count) {
 }
 
 void permute_bit_reversal_radix2(device_mem_t *x, int N, int log2N) {
-    kernel::permute_bit_reversal<2><<<N / cuNTT_TPB, cuNTT_TPB>>>(x, N, log2N);
+    kernel::permute_bit_reversal<2><<<N / cuNTT_TPB, cuNTT_TPB>>>(x, x, N, log2N);
 }
 
 void permute_bit_reversal_radix4(device_mem_t *x, int N, int log2N) {
-    kernel::permute_bit_reversal<4><<<N / cuNTT_TPB, cuNTT_TPB>>>(x, N, log2N);
+    kernel::permute_bit_reversal<4><<<N / cuNTT_TPB, cuNTT_TPB>>>(x, x, N, log2N);
 }
 
 void EltwiseAddMod(device_mem_t *out,
@@ -191,7 +191,6 @@ ntt_context::ntt_context(const mpz_class& p, size_t N, const mpz_class& nth_root
     from_mpz(N_inv_, Ni, cuNTT_LIMBS);
         
     kernel::precompute_omega_table<<<N / cuNTT_TPB, cuNTT_TPB>>>(err_, device_omegas_inv_, w, N);
-    CUDA_CHECK(cudaDeviceSynchronize());
 }
 
 ntt_context::~ntt_context() {
@@ -200,58 +199,46 @@ ntt_context::~ntt_context() {
     CUDA_CHECK(cudaFree(device_omegas_inv_));
 }
 
-void ntt_context::ComputeForwardRadix2(device_mem_t *out,
-                                       device_mem_t * const in,
-                                       int num_blocks,
-                                       int num_parallel,
-                                       int threads_per_block)
-{
+void ntt_context::ComputeForwardRadix2(device_mem_t *out, device_mem_t * const in) {
+    size_t num_blocks = degree_ / cuNTT_TPB, num_parallel = 1;
+    kernel::permute_bit_reversal<2><<<num_blocks, cuNTT_TPB>>> (out, in, degree_, std::log2(degree_));
     radix2_fft_forward(err_, out, in,
                        device_omegas_,
                        degree_,
                        dim3(num_blocks, num_parallel),
-                       threads_per_block);
+                       cuNTT_TPB);
 }
 
-void ntt_context::ComputeForwardRadix4(device_mem_t *out,
-                                       device_mem_t * const in,
-                                       int num_blocks,
-                                       int num_parallel,
-                                       int threads_per_block)
-{
+void ntt_context::ComputeForwardRadix4(device_mem_t *out, device_mem_t * const in) {
+    size_t num_blocks = degree_ / cuNTT_TPB, num_parallel = 1;
+    kernel::permute_bit_reversal<4><<<num_blocks, cuNTT_TPB>>> (out, in, degree_, std::log2(degree_));
     radix4_fft_forward(err_, out, in,
                        device_omegas_,
                        degree_,
                        dim3(num_blocks, num_parallel),
-                       threads_per_block);
+                       cuNTT_TPB);
 }
 
-void ntt_context::ComputeInverseRadix2(device_mem_t *out,
-                                       device_mem_t * const in,
-                                       int num_blocks,
-                                       int num_parallel,
-                                       int threads_per_block)
-{
+void ntt_context::ComputeInverseRadix2(device_mem_t *out, device_mem_t * const in) {
+    size_t num_blocks = degree_ / cuNTT_TPB, num_parallel = 1;
     radix2_fft_inverse(err_, out, in,
                        device_omegas_inv_,
                        N_inv_,
                        degree_,
                        dim3(num_blocks, num_parallel),
-                       threads_per_block);
+                       cuNTT_TPB);
+    kernel::permute_bit_reversal<2><<<num_blocks, cuNTT_TPB>>> (out, out, degree_, std::log2(degree_));
 }
 
-void ntt_context::ComputeInverseRadix4(device_mem_t *out,
-                                       device_mem_t * const in,
-                                       int num_blocks,
-                                       int num_parallel,
-                                       int threads_per_block)
-{
+void ntt_context::ComputeInverseRadix4(device_mem_t *out, device_mem_t * const in) {
+    size_t num_blocks = degree_ / cuNTT_TPB, num_parallel = 1;
     radix4_fft_inverse(err_, out, in,
                        device_omegas_inv_,
                        N_inv_,
                        degree_,
                        dim3(num_blocks, num_parallel),
-                       threads_per_block);
+                       cuNTT_TPB);
+    kernel::permute_bit_reversal<4><<<num_blocks, cuNTT_TPB>>> (out, out, degree_, std::log2(degree_));
 }
 
 }  // namespace cuNTT

@@ -32,8 +32,8 @@ using env_t = cgbn_env_t<context_t, cuNTT_BITS>;
 using num_t = typename env_t::cgbn_t;
 using wide_num_t = typename env_t::cgbn_wide_t;
 
-void to_mpz(mpz_class& r, const device_mem_t &x, uint32_t count);
-void from_mpz(device_mem_t &x, const mpz_class& s, uint32_t count);
+void to_mpz(mpz_class& r, const device_mem_t &x, uint32_t count = cuNTT_LIMBS);
+void from_mpz(device_mem_t &x, const mpz_class& s, uint32_t count = cuNTT_LIMBS);
 
 void permute_bit_reversal_radix2(device_mem_t *x, int N, int log2N);
 void permute_bit_reversal_radix4(device_mem_t *x, int N, int log2N);
@@ -100,28 +100,16 @@ struct ntt_context {
     ntt_context& operator=(ntt_context&&) = default;
 
     void ComputeForwardRadix2(device_mem_t *out,
-                              device_mem_t * const in,
-                              int num_blocks,
-                              int num_parallel,
-                              int threads_per_block);
+                              device_mem_t * const in);
 
     void ComputeForwardRadix4(device_mem_t *out,
-                              device_mem_t * const in,
-                              int num_blocks,
-                              int num_parallel,
-                              int threads_per_block);
+                              device_mem_t * const in);
 
     void ComputeInverseRadix2(device_mem_t *out,
-                              device_mem_t * const in,
-                              int num_blocks,
-                              int num_parallel,
-                              int threads_per_block);
+                              device_mem_t * const in);
 
     void ComputeInverseRadix4(device_mem_t *out,
-                              device_mem_t * const in,
-                              int num_blocks,
-                              int num_parallel,
-                              int threads_per_block);
+                              device_mem_t * const in);
 
 protected:
     size_t degree_;

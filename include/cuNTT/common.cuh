@@ -42,12 +42,16 @@ namespace kernel {
 
 template <size_t radix>
 __global__ void
-permute_bit_reversal(device_mem_t *x, int N, int log2N) {
-    for (unsigned int idx = blockDim.x * blockIdx.x + threadIdx.x;
-         idx < N;
-         idx += blockDim.x * gridDim.x)
+permute_bit_reversal(device_mem_t *out, device_mem_t * const in, int N, int log2N) {
+    context_t ctx;
+    env_t env(ctx.env<env_t>());
+
+    num_t v, rv;
+    for (unsigned int tidx = blockDim.x * blockIdx.x + threadIdx.x;
+         tidx < N * cuNTT_TPI;
+         tidx += blockDim.x * gridDim.x)
     {
-        unsigned int ridx;
+        unsigned int idx = tidx / cuNTT_TPI, ridx;
         if constexpr (radix == 2)
             ridx = bit_reverse(idx, log2N);
         else {
@@ -55,9 +59,11 @@ permute_bit_reversal(device_mem_t *x, int N, int log2N) {
         }
         
         if (idx < ridx) {
-            device_mem_t tmp = x[idx];
-            x[idx] = x[ridx];
-            x[ridx] = tmp;
+            env.load(v, &in[idx]);
+            env.load(rv, &in[ridx]);
+
+            env.store(&out[idx], rv);
+            env.store(&out[ridx], v);
         }
     }
 }

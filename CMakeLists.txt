@@ -20,9 +20,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_compile_options(-O3)
 
 if (BUILD_SHARED)
-  add_library(cuNTT SHARED src/cuNTT.cu)
+  add_library(cuNTT SHARED src/cuNTT.cu src/cuSHA.cu)
 else()
-  add_library(cuNTT STATIC src/cuNTT.cu)
+  add_library(cuNTT STATIC src/cuNTT.cu src/cuSHA.cu)
 endif()
 target_link_libraries(cuNTT gmp gmpxx cudart)
 

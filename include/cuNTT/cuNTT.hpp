@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <gmp.h>
 #include <gmpxx.h>
 #include <cuda.h>
@@ -39,45 +40,45 @@ void permute_bit_reversal_radix2(device_mem_t *x, int N, int log2N);
 void permute_bit_reversal_radix4(device_mem_t *x, int N, int log2N);
 
 void EltwiseAddMod(device_mem_t *out,
-                   device_mem_t * const __restrict__ x,
-                   device_mem_t * const __restrict__ y,
+                   const device_mem_t * const __restrict__ x,
+                   const device_mem_t * const __restrict__ y,
                    int N,
                    device_mem_t modulus);
 
 void EltwiseAddMod(device_mem_t *out,
-                   device_mem_t * const __restrict__ x,
+                   const device_mem_t * const __restrict__ x,
                    device_mem_t scalar,
                    int N,
                    device_mem_t modulus);
 
 void EltwiseSubMod(device_mem_t *out,
-                   device_mem_t * const __restrict__ x,
-                   device_mem_t * const __restrict__ y,
+                   const device_mem_t * const __restrict__ x,
+                   const device_mem_t * const __restrict__ y,
                    int N,
                    device_mem_t modulus);
 
 void EltwiseSubMod(device_mem_t *out,
-                   device_mem_t * const __restrict__ x,
+                   const device_mem_t * const __restrict__ x,
                    device_mem_t scalar,
                    int N,
                    device_mem_t modulus);
 
 void EltwiseMultMod(device_mem_t *out,
-                    device_mem_t * const __restrict__ x,
-                    device_mem_t * const __restrict__ y,
+                    const device_mem_t * const __restrict__ x,
+                    const device_mem_t * const __restrict__ y,
                     int N,
                     device_mem_t modulus);
 
 void EltwiseMultMod(device_mem_t *out,
-                    device_mem_t * const __restrict__ x,
+                    const device_mem_t * const __restrict__ x,
                     device_mem_t scalar,
                     int N,
                     device_mem_t modulus);
 
 void EltwiseFMAMod(device_mem_t *out,
-                   device_mem_t * const __restrict__ x,
+                   const device_mem_t * const __restrict__ x,
                    device_mem_t scalar,
-                   device_mem_t * const __restrict__ y,
+                   const device_mem_t * const __restrict__ y,
                    int N,
                    device_mem_t modulus);
 
@@ -88,16 +89,19 @@ void EltwiseFMAMod(device_mem_t *out,
 void ntt_init_global(const mpz_class& p);
 
 struct ntt_context {
+    struct cgbn_deleter {
+        void operator()(cgbn_error_report_t * p) const {
+            CUDA_CHECK(cgbn_error_report_free(p));
+        }        
+    };
+    struct device_deleter {
+        void operator()(device_mem_t * p) const {
+            CUDA_CHECK(cudaFree(p));
+        }
+    };
+    
     ntt_context() = default;
     ntt_context(const mpz_class& p, size_t N, const mpz_class& nth_root_of_unity);
-
-    ~ntt_context(); 
-
-    ntt_context(const ntt_context&) = delete;
-    ntt_context& operator=(const ntt_context&) = delete;
-
-    ntt_context(ntt_context&&) = default;
-    ntt_context& operator=(ntt_context&&) = default;
 
     void ComputeForwardRadix2(device_mem_t *out,
                               device_mem_t * const in);
@@ -113,11 +117,30 @@ struct ntt_context {
 
 protected:
     size_t degree_;
-    cgbn_error_report_t *err_ = nullptr;
-    device_mem_t *device_omegas_ = nullptr;
-    device_mem_t *device_omegas_inv_ = nullptr;
+    std::unique_ptr<cgbn_error_report_t, cgbn_deleter> err_          = nullptr;
+    std::unique_ptr<device_mem_t, device_deleter> device_omegas_     = nullptr;
+    std::unique_ptr<device_mem_t, device_deleter> device_omegas_inv_ = nullptr;
     device_mem_t N_inv_;
 };
 
 
-} // namespace cuNTT;
+void sample(device_mem_t *out, const device_mem_t *in, const size_t *index, size_t N);
+
+} // namespace cuNTT
+
+
+namespace cuSHA {
+
+struct SHA256_CTX {
+	uint8_t data[64];
+	uint32_t datalen;
+	uint64_t bitlen;
+	uint32_t state[8];
+};
+
+void sha256_init(SHA256_CTX ctxs[], size_t N);
+void sha256_update(SHA256_CTX ctxs[], const uint8_t *data, size_t N, size_t batch_size);
+void sha256_update(SHA256_CTX ctxs[], const cuNTT::device_mem_t *data, size_t N);
+void sha256_final(SHA256_CTX ctxs[], uint8_t *out, size_t N);
+
+}  // namespace cuSHA

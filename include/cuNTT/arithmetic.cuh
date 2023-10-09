@@ -4,25 +4,25 @@ namespace cuNTT::kernel {
 
 __global__ void
 EltwiseAddMod(device_mem_t *out,
-              device_mem_t * const __restrict__ x,
-              device_mem_t * const __restrict__ y,
+              device_mem_t const * const __restrict__ x,
+              device_mem_t const * const __restrict__ y,
               int N,
               device_mem_t modulus)
 {
     context_t ctx(cgbn_report_monitor);
-    env_t env(ctx.env<env_t>());
+    const env_t env(ctx.env<env_t>());
 
     num_t a, b, p;
-    env.load(b, &modulus);
+    env.load(p, &modulus);
     
     for (int curr_thread = blockDim.x * blockIdx.x + threadIdx.x;
          curr_thread < N * cuNTT_TPI;
          curr_thread += blockDim.x * gridDim.x)
     {
         const int instance = curr_thread / cuNTT_TPI;
-        
-        env.load(a, &x[instance]);
-        env.load(b, &y[instance]);
+
+        env.load(a, const_cast<device_mem_t*>(&x[instance]));
+        env.load(b, const_cast<device_mem_t*>(&y[instance]));
         
         env.add(a, a, b);
         
@@ -37,7 +37,7 @@ EltwiseAddMod(device_mem_t *out,
 
 __global__ void
 EltwiseAddMod(device_mem_t *out,
-              device_mem_t * const __restrict__ x,
+              const device_mem_t * const __restrict__ x,
               device_mem_t scalar,
               int N,
               device_mem_t modulus)
@@ -55,7 +55,7 @@ EltwiseAddMod(device_mem_t *out,
     {
         const int instance = curr_thread / cuNTT_TPI;
         
-        env.load(a, &x[instance]);
+        env.load(a, const_cast<device_mem_t*>(&x[instance]));
         env.add(a, a, s);
         
         if (env.compare(a, p) >= 0) {
@@ -69,8 +69,8 @@ EltwiseAddMod(device_mem_t *out,
 
 __global__ void
 EltwiseSubMod(device_mem_t *out,
-              device_mem_t * const __restrict__ x,
-              device_mem_t * const __restrict__ y,
+              const device_mem_t * const __restrict__ x,
+              const device_mem_t * const __restrict__ y,
               int N,
               device_mem_t modulus)
 {
@@ -86,8 +86,8 @@ EltwiseSubMod(device_mem_t *out,
     {
         const int instance = curr_thread / cuNTT_TPI;
         
-        env.load(a, &x[instance]);
-        env.load(b, &y[instance]);
+        env.load(a, const_cast<device_mem_t*>(&x[instance]));
+        env.load(b, const_cast<device_mem_t*>(&y[instance]));
         
         env.add(a, a, p);
         env.sub(a, a, b);
@@ -103,7 +103,7 @@ EltwiseSubMod(device_mem_t *out,
 
 __global__ void
 EltwiseSubMod(device_mem_t *out,
-              device_mem_t * const __restrict__ x,
+              const device_mem_t * const __restrict__ x,
               device_mem_t scalar,
               int N,
               device_mem_t modulus)
@@ -121,7 +121,7 @@ EltwiseSubMod(device_mem_t *out,
     {
         const int instance = curr_thread / cuNTT_TPI;
         
-        env.load(a, &x[instance]);
+        env.load(a, const_cast<device_mem_t*>(&x[instance]));
         
         env.add(a, a, p);
         env.sub(a, a, s);
@@ -137,8 +137,8 @@ EltwiseSubMod(device_mem_t *out,
 
 __global__ void
 EltwiseMultMod(device_mem_t *out,
-               device_mem_t * const __restrict__ x,
-               device_mem_t * const __restrict__ y,
+               const device_mem_t * const __restrict__ x,
+               const device_mem_t * const __restrict__ y,
                int N,
                device_mem_t modulus)
 {
@@ -155,8 +155,8 @@ EltwiseMultMod(device_mem_t *out,
     {
         const int instance = curr_thread / cuNTT_TPI;
         
-        env.load(a, &x[instance]);
-        env.load(b, &y[instance]);
+        env.load(a, const_cast<device_mem_t*>(&x[instance]));
+        env.load(b, const_cast<device_mem_t*>(&y[instance]));
         
         env.mul_wide(tmp, a, b);
         env.rem_wide(a, tmp, p);
@@ -167,7 +167,7 @@ EltwiseMultMod(device_mem_t *out,
 
 __global__ void
 EltwiseMultMod(device_mem_t *out,
-               device_mem_t * const __restrict__ x,
+               const device_mem_t * const __restrict__ x,
                device_mem_t scalar,
                int N,
                device_mem_t modulus)
@@ -186,7 +186,7 @@ EltwiseMultMod(device_mem_t *out,
     {
         const int instance = curr_thread / cuNTT_TPI;
         
-        env.load(a, &x[instance]);
+        env.load(a, const_cast<device_mem_t*>(&x[instance]));
 
         env.mul_wide(tmp, a, s);
         env.rem_wide(a, tmp, p);
@@ -198,9 +198,9 @@ EltwiseMultMod(device_mem_t *out,
 
 __global__ void
 EltwiseFMAMod(device_mem_t *out,
-              device_mem_t * const __restrict__ x,
+              const device_mem_t * const __restrict__ x,
               device_mem_t scalar,
-              device_mem_t * const __restrict__ y,
+              const device_mem_t * const __restrict__ y,
               int N,
               device_mem_t modulus)
 {
@@ -218,8 +218,8 @@ EltwiseFMAMod(device_mem_t *out,
     {
         const int instance = curr_thread / cuNTT_TPI;
         
-        env.load(a, &x[instance]);
-        env.load(b, &y[instance]);
+        env.load(a, const_cast<device_mem_t*>(&x[instance]));
+        env.load(b, const_cast<device_mem_t*>(&y[instance]));
 
         env.mul_wide(tmp, a, s);
         env.rem_wide(a, tmp, p);

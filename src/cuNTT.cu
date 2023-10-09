@@ -2,6 +2,9 @@
 #include <exception>
 #include <cassert>
 
+#include <thrust/gather.h>
+#include <thrust/device_ptr.h>
+
 #include <cuNTT/cuNTT.hpp>
 #include <cuNTT/common.cuh>
 #include <cuNTT/radix2.cuh>
@@ -11,6 +14,8 @@
 struct cuda_runtime_error : std::runtime_error {
     using std::runtime_error::runtime_error;
 };
+
+constexpr size_t calc_blocks(size_t len) { return (len + cuNTT_TPB - 1) / cuNTT_TPB; }
 
 void cuda_check(cudaError_t status, const char *action, const char *file, int line) {
     std::string err;
@@ -75,75 +80,75 @@ void from_mpz(device_mem_t &x, const mpz_class& s, uint32_t count) {
 }
 
 void permute_bit_reversal_radix2(device_mem_t *x, int N, int log2N) {
-    kernel::permute_bit_reversal<2><<<N / cuNTT_TPB, cuNTT_TPB>>>(x, x, N, log2N);
+    kernel::permute_bit_reversal<2><<<calc_blocks(N), cuNTT_TPB>>>(x, x, N, log2N);
 }
 
 void permute_bit_reversal_radix4(device_mem_t *x, int N, int log2N) {
-    kernel::permute_bit_reversal<4><<<N / cuNTT_TPB, cuNTT_TPB>>>(x, x, N, log2N);
+    kernel::permute_bit_reversal<4><<<calc_blocks(N), cuNTT_TPB>>>(x, x, N, log2N);
 }
 
 void EltwiseAddMod(device_mem_t *out,
-                   device_mem_t * const __restrict__ x,
-                   device_mem_t * const __restrict__ y,
+                   const device_mem_t * const __restrict__ x,
+                   const device_mem_t * const __restrict__ y,
                    int N,
                    device_mem_t modulus)
 {
-    kernel::EltwiseAddMod<<<N / cuNTT_TPB, cuNTT_TPB>>>(out, x, y, N, modulus);
+    kernel::EltwiseAddMod<<<calc_blocks(N), cuNTT_TPB>>>(out, x, y, N, modulus);
 }
 
 void EltwiseAddMod(device_mem_t *out,
-                   device_mem_t * const __restrict__ x,
+                   const device_mem_t * const __restrict__ x,
                    device_mem_t scalar,
                    int N,
                    device_mem_t modulus)
 {
-    kernel::EltwiseAddMod<<<N / cuNTT_TPB, cuNTT_TPB>>>(out, x, scalar, N, modulus);
+    kernel::EltwiseAddMod<<<calc_blocks(N), cuNTT_TPB>>>(out, x, scalar, N, modulus);
 }
 
 void EltwiseSubMod(device_mem_t *out,
-                   device_mem_t * const __restrict__ x,
-                   device_mem_t * const __restrict__ y,
+                   const device_mem_t * const __restrict__ x,
+                   const device_mem_t * const __restrict__ y,
                    int N,
                    device_mem_t modulus)
 {
-    kernel::EltwiseSubMod<<<N / cuNTT_TPB, cuNTT_TPB>>>(out, x, y, N, modulus);
+    kernel::EltwiseSubMod<<<calc_blocks(N), cuNTT_TPB>>>(out, x, y, N, modulus);
 }
 
 void EltwiseSubMod(device_mem_t *out,
-                   device_mem_t * const __restrict__ x,
+                   const device_mem_t * const __restrict__ x,
                    device_mem_t scalar,
                    int N,
                    device_mem_t modulus)
 {
-    kernel::EltwiseSubMod<<<N / cuNTT_TPB, cuNTT_TPB>>>(out, x, scalar, N, modulus);
+    kernel::EltwiseSubMod<<<calc_blocks(N), cuNTT_TPB>>>(out, x, scalar, N, modulus);
 }
 
 void EltwiseMultMod(device_mem_t *out,
-                    device_mem_t * const __restrict__ x,
-                    device_mem_t * const __restrict__ y,
+                    const device_mem_t * const __restrict__ x,
+                    const device_mem_t * const __restrict__ y,
                     int N,
                     device_mem_t modulus)
 {
-    kernel::EltwiseMultMod<<<N / cuNTT_TPB, cuNTT_TPB>>>(out, x, y, N, modulus);
+    kernel::EltwiseMultMod<<<calc_blocks(N), cuNTT_TPB>>>(out, x, y, N, modulus);
 }
 
 void EltwiseMultMod(device_mem_t *out,
-                    device_mem_t * const __restrict__ x,
+                    const device_mem_t * const __restrict__ x,
                     device_mem_t scalar,
                     int N,
                     device_mem_t modulus)
 {
-    kernel::EltwiseMultMod<<<N / cuNTT_TPB, cuNTT_TPB>>>(out, x, scalar, N, modulus);
+    kernel::EltwiseMultMod<<<calc_blocks(N), cuNTT_TPB>>>(out, x, scalar, N, modulus);
 }
 
 void EltwiseFMAMod(device_mem_t *out,
-                   device_mem_t * const __restrict__ x,
+                   const device_mem_t * const __restrict__ x,
                    device_mem_t scalar,
-                   device_mem_t * const __restrict__ y,
+                   const device_mem_t * const __restrict__ y,
                    int N,
                    device_mem_t modulus)
 {
-    kernel::EltwiseFMAMod<<<N / cuNTT_TPB, cuNTT_TPB>>>(out, x, scalar, y, N, modulus);
+    kernel::EltwiseFMAMod<<<calc_blocks(N), cuNTT_TPB>>>(out, x, scalar, y, N, modulus);
 }
 
 void ntt_init_global(const mpz_class& p) {
@@ -171,15 +176,22 @@ void ntt_init_global(const mpz_class& p) {
 
 
 ntt_context::ntt_context(const mpz_class& p, size_t N, const mpz_class& nth_root_of_unity) : degree_(N) {
-    CUDA_CHECK(cgbn_error_report_alloc(&err_));
-    CUDA_CHECK(cudaMalloc((void **)&device_omegas_, sizeof(device_mem_t) * N));
-    CUDA_CHECK(cudaMalloc((void **)&device_omegas_inv_, sizeof(device_mem_t) * N));
+    cgbn_error_report_t *err;
+    device_mem_t *omega, *omega_inv;
+    
+    CUDA_CHECK(cgbn_error_report_alloc(&err));
+    CUDA_CHECK(cudaMalloc((void **)&omega, sizeof(device_mem_t) * N));
+    CUDA_CHECK(cudaMalloc((void **)&omega_inv, sizeof(device_mem_t) * N));
+
+    err_ = std::unique_ptr<cgbn_error_report_t, cgbn_deleter>(err);
+    device_omegas_ = std::unique_ptr<device_mem_t, device_deleter>(omega);
+    device_omegas_inv_ = std::unique_ptr<device_mem_t, device_deleter>(omega_inv);
 
     device_mem_t w;
         
     // Precompute Forward NTT omegas
     from_mpz(w, nth_root_of_unity, cuNTT_LIMBS);
-    kernel::precompute_omega_table<<<N / cuNTT_TPB, cuNTT_TPB>>>(err_, device_omegas_, w, N);
+    kernel::precompute_omega_table<<<calc_blocks(N), cuNTT_TPB>>>(err_.get(), device_omegas_.get(), w, N);
 
     // Precompute Inverse NTT omegas
     mpz_class wi, Ni = N;
@@ -190,39 +202,39 @@ ntt_context::ntt_context(const mpz_class& p, size_t N, const mpz_class& nth_root
     from_mpz(w, wi, cuNTT_LIMBS);
     from_mpz(N_inv_, Ni, cuNTT_LIMBS);
         
-    kernel::precompute_omega_table<<<N / cuNTT_TPB, cuNTT_TPB>>>(err_, device_omegas_inv_, w, N);
+    kernel::precompute_omega_table<<<calc_blocks(N), cuNTT_TPB>>>(err_.get(), device_omegas_inv_.get(), w, N);
 }
 
-ntt_context::~ntt_context() {
-    CUDA_CHECK(cgbn_error_report_free(err_));
-    CUDA_CHECK(cudaFree(device_omegas_));
-    CUDA_CHECK(cudaFree(device_omegas_inv_));
-}
+// ntt_context::~ntt_context() {
+//     CUDA_CHECK(cgbn_error_report_free(err_));
+//     CUDA_CHECK(cudaFree(device_omegas_));
+//     CUDA_CHECK(cudaFree(device_omegas_inv_));
+// }
 
 void ntt_context::ComputeForwardRadix2(device_mem_t *out, device_mem_t * const in) {
-    size_t num_blocks = degree_ / cuNTT_TPB, num_parallel = 1;
+    size_t num_blocks = calc_blocks(degree_), num_parallel = 1;
     kernel::permute_bit_reversal<2><<<num_blocks, cuNTT_TPB>>> (out, in, degree_, std::log2(degree_));
-    radix2_fft_forward(err_, out, in,
-                       device_omegas_,
+    radix2_fft_forward(err_.get(), out, in,
+                       device_omegas_.get(),
                        degree_,
                        dim3(num_blocks, num_parallel),
                        cuNTT_TPB);
 }
 
 void ntt_context::ComputeForwardRadix4(device_mem_t *out, device_mem_t * const in) {
-    size_t num_blocks = degree_ / cuNTT_TPB, num_parallel = 1;
+    size_t num_blocks = calc_blocks(degree_), num_parallel = 1;
     kernel::permute_bit_reversal<4><<<num_blocks, cuNTT_TPB>>> (out, in, degree_, std::log2(degree_));
-    radix4_fft_forward(err_, out, in,
-                       device_omegas_,
+    radix4_fft_forward(err_.get(), out, in,
+                       device_omegas_.get(),
                        degree_,
                        dim3(num_blocks, num_parallel),
                        cuNTT_TPB);
 }
 
 void ntt_context::ComputeInverseRadix2(device_mem_t *out, device_mem_t * const in) {
-    size_t num_blocks = degree_ / cuNTT_TPB, num_parallel = 1;
-    radix2_fft_inverse(err_, out, in,
-                       device_omegas_inv_,
+    size_t num_blocks = calc_blocks(degree_), num_parallel = 1;
+    radix2_fft_inverse(err_.get(), out, in,
+                       device_omegas_inv_.get(),
                        N_inv_,
                        degree_,
                        dim3(num_blocks, num_parallel),
@@ -231,14 +243,31 @@ void ntt_context::ComputeInverseRadix2(device_mem_t *out, device_mem_t * const i
 }
 
 void ntt_context::ComputeInverseRadix4(device_mem_t *out, device_mem_t * const in) {
-    size_t num_blocks = degree_ / cuNTT_TPB, num_parallel = 1;
-    radix4_fft_inverse(err_, out, in,
-                       device_omegas_inv_,
+    size_t num_blocks = calc_blocks(degree_), num_parallel = 1;
+    radix4_fft_inverse(err_.get(), out, in,
+                       device_omegas_inv_.get(),
                        N_inv_,
                        degree_,
                        dim3(num_blocks, num_parallel),
                        cuNTT_TPB);
     kernel::permute_bit_reversal<4><<<num_blocks, cuNTT_TPB>>> (out, out, degree_, std::log2(degree_));
+}
+
+
+
+__global__ void gatherKernel(const device_mem_t * __restrict__ input,
+                             const size_t * __restrict__ indices,
+                             device_mem_t * __restrict__ output,
+                             size_t numIndices) {
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < numIndices) {
+        output[idx] = input[indices[idx]];
+    }
+}
+
+void sample(device_mem_t *out, const device_mem_t *in, const size_t *index, size_t N)
+{
+    gatherKernel<<<calc_blocks(N), cuNTT_TPB>>>(in, index, out, N);
 }
 
 }  // namespace cuNTT

@@ -12,15 +12,25 @@ static __constant__ uint32_t reverse_mask_high[5] = {
     0xAAAAAAAA, 0xCCCCCCCC, 0xF0F0F0F0, 0xFF00FF00, 0xFFFF0000
 };
 
+// Note: Require y = beta * y mod p
 __device__ __forceinline__ void
 montgomery_mul(env_t& env, num_t& out, const num_t& x, const num_t& y, const num_t& p, const num_t& J) {
     wide_num_t U;
-    
+
+    // U = U1 * beta + U0 (wide product)
     env.mul_wide(U, x, y);
+
+    // Q = U0 * J mod beta (low product)
     env.mul(U._low, U._low, J);
+
+    // H = Q * p / beta (high product)
     env.mul_high(U._low, U._low, p);
+
+    // U0 = U1 - H + p
     env.sub(U._low, p, U._low);
     env.add(out, U._high, U._low);
+
+    // out is in [0, 2p) since we skipped the branching
 }
 
 __device__ uint32_t bit_reverse(uint32_t x, uint32_t bits) {

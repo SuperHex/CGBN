@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cooperative_groups.h>
+
+namespace cg = cooperative_groups;
+
 namespace cuNTT {
 
 void radix2_fft_forward(report_error_t * err,
@@ -74,8 +78,6 @@ radix2_DIF_butterfly(report_error_t *err,
     }
 }
 
-
-
 __global__ void
 radix2_DIT_butterfly(report_error_t *err,
                      device_mem_t *out,
@@ -132,15 +134,13 @@ radix2_DIT_butterfly(report_error_t *err,
 
 void radix2_fft_forward(report_error_t *err,
                         device_mem_t *out,
-                        device_mem_t * const __restrict__ in,
-                        device_mem_t * const __restrict__ omega_table,
+                        device_mem_t * in,
+                        device_mem_t * omega_table,
                         int N,
                         dim3 block_dim,
                         int threads_per_block)
 {
-    const int iterations = std::log2(N);
-
-    // dim3 block_size(num_blocks, num_parallel);
+    int iterations = std::log2(N);
 
     kernel::radix2_DIF_butterfly<<<block_dim, threads_per_block>>>(err, out, in, omega_table, N, iterations);
     

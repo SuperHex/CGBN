@@ -7,8 +7,10 @@
 #include <cuda_runtime_api.h>
 #include <cgbn/cgbn.h>
 
-inline constexpr size_t cuNTT_TPI  = 4;
-inline constexpr size_t cuNTT_TPB  = 256;
+inline constexpr size_t cuNTT_TPI  = 4;                     // threads per instance
+inline constexpr size_t cuNTT_TPB  = 256;                   // threads per block
+inline constexpr size_t cuNTT_IPB = cuNTT_TPB / cuNTT_TPI;  // instances per block
+
 inline constexpr size_t cuNTT_BITS = 256;
 inline constexpr size_t cuNTT_LIMBS = (cuNTT_BITS + 31) / 32;
 
@@ -63,6 +65,12 @@ void EltwiseSubMod(device_mem_t *out,
                    int N,
                    device_mem_t modulus);
 
+void EltwiseSubMod(device_mem_t *out,
+                   device_mem_t scalar,
+                   const device_mem_t * const __restrict__ x,
+                   int N,
+                   device_mem_t modulus);
+
 void EltwiseMultMod(device_mem_t *out,
                     const device_mem_t * const __restrict__ x,
                     const device_mem_t * const __restrict__ y,
@@ -75,12 +83,43 @@ void EltwiseMultMod(device_mem_t *out,
                     int N,
                     device_mem_t modulus);
 
+void EltwiseDivMod(device_mem_t *out,
+                   const device_mem_t * const __restrict__ x,
+                   const device_mem_t * const __restrict__ y,
+                   int N,
+                   device_mem_t modulus);
+
+void EltwiseInvMod(device_mem_t *out,
+                   const device_mem_t * const __restrict__ x,
+                   int N,
+                   device_mem_t modulus);
+
 void EltwiseFMAMod(device_mem_t *out,
                    const device_mem_t * const __restrict__ x,
                    device_mem_t scalar,
                    const device_mem_t * const __restrict__ y,
                    int N,
                    device_mem_t modulus);
+
+void EltwiseFMAMod(device_mem_t *out,
+                   const device_mem_t * const __restrict__ x,
+                   const device_mem_t * const __restrict__ r,
+                   const device_mem_t * const __restrict__ y,
+                   int N,
+                   device_mem_t modulus);
+
+void UpdateQuadratic(device_mem_t *out,
+                     const device_mem_t * const __restrict__ x,
+                     const device_mem_t * const __restrict__ y,
+                     const device_mem_t * const __restrict__ z,
+                     device_mem_t r,
+                     int N,
+                     device_mem_t modulus);
+
+void EltwiseBitDecompose(device_mem_t *out[],
+                         const device_mem_t * const __restrict__ x,
+                         int N,
+                         int bits);
 
 /**
    Note: **MUST** call before calling any other GPU NTT functions
@@ -125,6 +164,8 @@ protected:
 
 
 void sample(device_mem_t *out, const device_mem_t *in, const size_t *index, size_t N);
+void memset_ui(device_mem_t arr[], int val, size_t N);
+void memset_mpz(device_mem_t arr[], device_mem_t val, size_t N);
 
 } // namespace cuNTT
 

@@ -15,7 +15,7 @@ struct cuda_runtime_error : std::runtime_error {
     using std::runtime_error::runtime_error;
 };
 
-constexpr size_t calc_blocks(size_t len) { return (len + cuNTT_TPB - 1) / cuNTT_TPB; }
+constexpr size_t calc_blocks(size_t len) { return (len + cuNTT_IPB - 1) / cuNTT_IPB; }
 
 void cuda_check(cudaError_t status, const char *action, const char *file, int line) {
     std::string err;
@@ -123,6 +123,15 @@ void EltwiseSubMod(device_mem_t *out,
     kernel::EltwiseSubMod<<<calc_blocks(N), cuNTT_TPB>>>(out, x, scalar, N, modulus);
 }
 
+void EltwiseSubMod(device_mem_t *out,
+                   device_mem_t scalar,
+                   const device_mem_t * const __restrict__ x,
+                   int N,
+                   device_mem_t modulus)
+{
+    kernel::EltwiseSubMod<<<calc_blocks(N), cuNTT_TPB>>>(out, scalar, x, N, modulus);
+}
+
 void EltwiseMultMod(device_mem_t *out,
                     const device_mem_t * const __restrict__ x,
                     const device_mem_t * const __restrict__ y,
@@ -141,6 +150,23 @@ void EltwiseMultMod(device_mem_t *out,
     kernel::EltwiseMultMod<<<calc_blocks(N), cuNTT_TPB>>>(out, x, scalar, N, modulus);
 }
 
+void EltwiseDivMod(device_mem_t *out,
+                   const device_mem_t * const __restrict__ x,
+                   const device_mem_t * const __restrict__ y,
+                   int N,
+                   device_mem_t modulus)
+{
+    kernel::EltwiseDivMod<<<calc_blocks(N), cuNTT_TPB>>>(out, x, y, N, modulus);
+}
+
+void EltwiseInvMod(device_mem_t *out,
+                   const device_mem_t * const __restrict__ x,
+                   int N,
+                   device_mem_t modulus)
+{
+    kernel::EltwiseInvMod<<<calc_blocks(N), cuNTT_TPB>>>(out, x, N, modulus);
+}
+
 void EltwiseFMAMod(device_mem_t *out,
                    const device_mem_t * const __restrict__ x,
                    device_mem_t scalar,
@@ -151,6 +177,35 @@ void EltwiseFMAMod(device_mem_t *out,
     kernel::EltwiseFMAMod<<<calc_blocks(N), cuNTT_TPB>>>(out, x, scalar, y, N, modulus);
 }
 
+void EltwiseFMAMod(device_mem_t *out,
+                   const device_mem_t * const __restrict__ x,
+                   const device_mem_t * const __restrict__ r,
+                   const device_mem_t * const __restrict__ y,
+                   int N,
+                   device_mem_t modulus)
+{
+    kernel::EltwiseFMAMod<<<calc_blocks(N), cuNTT_TPB>>>(out, x, r, y, N, modulus);
+}
+
+void UpdateQuadratic(device_mem_t *out,
+                     const device_mem_t * const __restrict__ x,
+                     const device_mem_t * const __restrict__ y,
+                     const device_mem_t * const __restrict__ z,
+                     device_mem_t r,
+                     int N,
+                     device_mem_t modulus)
+{
+    kernel::UpdateQuadratic<<<calc_blocks(N), cuNTT_TPB>>>(out, x, y, z, r, N, modulus);
+}
+
+void EltwiseBitDecompose(device_mem_t *out[],
+                         const device_mem_t * const __restrict__ x,
+                         int N,
+                         int bits)
+{
+    kernel::EltwiseBitDecompose<<<calc_blocks(N), cuNTT_TPB>>>(out, x, N, bits);
+}
+
 void ntt_init_global(const mpz_class& p) {
     mpz_class two_p = p * 2, four_p = p * 4, eight_p = p * 8;
     device_mem_t device_p, device_2p, device_4p, device_8p;
@@ -158,12 +213,12 @@ void ntt_init_global(const mpz_class& p) {
     from_mpz(device_p,  p,       cuNTT_LIMBS);
     from_mpz(device_2p, two_p,   cuNTT_LIMBS);
     from_mpz(device_4p, four_p,  cuNTT_LIMBS);
-    from_mpz(device_8p, eight_p, cuNTT_LIMBS);
+    // from_mpz(device_8p, eight_p, cuNTT_LIMBS);
 
     CUDA_CHECK(cudaMemcpyToSymbol(gpu_p,  &device_p,  sizeof(device_mem_t)));
     CUDA_CHECK(cudaMemcpyToSymbol(gpu_2p, &device_2p, sizeof(device_mem_t)));
     CUDA_CHECK(cudaMemcpyToSymbol(gpu_4p, &device_4p, sizeof(device_mem_t)));
-    CUDA_CHECK(cudaMemcpyToSymbol(gpu_8p, &device_8p, sizeof(device_mem_t)));
+    // CUDA_CHECK(cudaMemcpyToSymbol(gpu_8p, &device_8p, sizeof(device_mem_t)));
 
     mpz_class J;
     device_mem_t device_J;
@@ -205,15 +260,11 @@ ntt_context::ntt_context(const mpz_class& p, size_t N, const mpz_class& nth_root
     kernel::precompute_omega_table<<<calc_blocks(N), cuNTT_TPB>>>(err_.get(), device_omegas_inv_.get(), w, N);
 }
 
-// ntt_context::~ntt_context() {
-//     CUDA_CHECK(cgbn_error_report_free(err_));
-//     CUDA_CHECK(cudaFree(device_omegas_));
-//     CUDA_CHECK(cudaFree(device_omegas_inv_));
-// }
-
 void ntt_context::ComputeForwardRadix2(device_mem_t *out, device_mem_t * const in) {
     size_t num_blocks = calc_blocks(degree_), num_parallel = 1;
     kernel::permute_bit_reversal<2><<<num_blocks, cuNTT_TPB>>> (out, in, degree_, std::log2(degree_));
+
+    
     radix2_fft_forward(err_.get(), out, in,
                        device_omegas_.get(),
                        degree_,
@@ -221,15 +272,16 @@ void ntt_context::ComputeForwardRadix2(device_mem_t *out, device_mem_t * const i
                        cuNTT_TPB);
 }
 
-void ntt_context::ComputeForwardRadix4(device_mem_t *out, device_mem_t * const in) {
-    size_t num_blocks = calc_blocks(degree_), num_parallel = 1;
-    kernel::permute_bit_reversal<4><<<num_blocks, cuNTT_TPB>>> (out, in, degree_, std::log2(degree_));
-    radix4_fft_forward(err_.get(), out, in,
-                       device_omegas_.get(),
-                       degree_,
-                       dim3(num_blocks, num_parallel),
-                       cuNTT_TPB);
-}
+// NOTE: uncomment 8p to use radix4!
+// void ntt_context::ComputeForwardRadix4(device_mem_t *out, device_mem_t * const in) {
+//     size_t num_blocks = calc_blocks(degree_), num_parallel = 1;
+//     kernel::permute_bit_reversal<4><<<num_blocks, cuNTT_TPB>>> (out, in, degree_, std::log2(degree_));
+//     radix4_fft_forward(err_.get(), out, in,
+//                        device_omegas_.get(),
+//                        degree_,
+//                        dim3(num_blocks, num_parallel),
+//                        cuNTT_TPB);
+// }
 
 void ntt_context::ComputeInverseRadix2(device_mem_t *out, device_mem_t * const in) {
     size_t num_blocks = calc_blocks(degree_), num_parallel = 1;
@@ -242,18 +294,17 @@ void ntt_context::ComputeInverseRadix2(device_mem_t *out, device_mem_t * const i
     kernel::permute_bit_reversal<2><<<num_blocks, cuNTT_TPB>>> (out, out, degree_, std::log2(degree_));
 }
 
-void ntt_context::ComputeInverseRadix4(device_mem_t *out, device_mem_t * const in) {
-    size_t num_blocks = calc_blocks(degree_), num_parallel = 1;
-    radix4_fft_inverse(err_.get(), out, in,
-                       device_omegas_inv_.get(),
-                       N_inv_,
-                       degree_,
-                       dim3(num_blocks, num_parallel),
-                       cuNTT_TPB);
-    kernel::permute_bit_reversal<4><<<num_blocks, cuNTT_TPB>>> (out, out, degree_, std::log2(degree_));
-}
-
-
+// NOTE: uncomment 8p to use radix4!
+// void ntt_context::ComputeInverseRadix4(device_mem_t *out, device_mem_t * const in) {
+//     size_t num_blocks = calc_blocks(degree_), num_parallel = 1;
+//     radix4_fft_inverse(err_.get(), out, in,
+//                        device_omegas_inv_.get(),
+//                        N_inv_,
+//                        degree_,
+//                        dim3(num_blocks, num_parallel),
+//                        cuNTT_TPB);
+//     kernel::permute_bit_reversal<4><<<num_blocks, cuNTT_TPB>>> (out, out, degree_, std::log2(degree_));
+// }
 
 __global__ void gatherKernel(const device_mem_t * __restrict__ input,
                              const size_t * __restrict__ indices,
@@ -268,6 +319,39 @@ __global__ void gatherKernel(const device_mem_t * __restrict__ input,
 void sample(device_mem_t *out, const device_mem_t *in, const size_t *index, size_t N)
 {
     gatherKernel<<<calc_blocks(N), cuNTT_TPB>>>(in, index, out, N);
+}
+
+
+__global__ void memset_ui_kernel(device_mem_t arr[], int val, size_t N) {
+    for (int idx = blockDim.x * blockIdx.x + threadIdx.x;
+         idx < N;
+         idx += blockDim.x * gridDim.x)
+    {
+        arr[idx]._limbs[0] = val;
+
+        #pragma unroll 8
+        for (int i = 1; i < cuNTT_LIMBS; i++) {
+            arr[idx]._limbs[i] = 0;
+        }
+    }
+}
+
+
+__global__ void memset_mpz_kernel(device_mem_t arr[], device_mem_t val, size_t N) {
+    for (int idx = blockDim.x * blockIdx.x + threadIdx.x;
+         idx < N;
+         idx += blockDim.x * gridDim.x)
+    {
+        arr[idx] = val;
+    }
+}
+
+void memset_ui(device_mem_t arr[], int val, size_t N) {
+    memset_ui_kernel<<<calc_blocks(N), cuNTT_TPB>>>(arr, val, N);
+}
+
+void memset_mpz(device_mem_t arr[], device_mem_t val, size_t N) {
+    memset_mpz_kernel<<<calc_blocks(N), cuNTT_TPB>>>(arr, val, N);
 }
 
 }  // namespace cuNTT

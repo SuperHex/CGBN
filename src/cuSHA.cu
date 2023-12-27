@@ -208,23 +208,27 @@ kernel_sha256_final(SHA256_CTX *ctxs, uint8_t *out, size_t N) {
     }
 }
 
+constexpr size_t cuSHA_TPB = 512;
+constexpr size_t cuSHA_calc_grid(size_t N) { return (N + cuSHA_TPB - 1) / cuSHA_TPB; }
+
 void sha256_init(SHA256_CTX ctxs[], size_t N) {
-    kernel_sha256_init<<<N, cuNTT_TPB>>>(ctxs, N);
+    kernel_sha256_init<<<cuSHA_calc_grid(N), cuSHA_TPB>>>(ctxs, N);
 }
 
 void sha256_update(SHA256_CTX ctxs[], const uint8_t *data, size_t N, size_t batch_size) {
-    kernel_sha256_update<<<N, cuNTT_TPB>>>(ctxs, data, N, batch_size);
+    kernel_sha256_update<<<cuSHA_calc_grid(N), cuSHA_TPB>>>(ctxs, data, N, batch_size);
 }
 
 void sha256_update(SHA256_CTX ctxs[], const cuNTT::device_mem_t *data, size_t N) {
-    kernel_sha256_update<<<N, cuNTT_TPB>>>(ctxs,
-                                           reinterpret_cast<const uint8_t*>(data),
-                                           N,
-                                           cuNTT_LIMBS * sizeof(uint32_t));
+    kernel_sha256_update<<<cuSHA_calc_grid(N), cuSHA_TPB>>>(
+        ctxs,
+        reinterpret_cast<const uint8_t*>(data),
+        N,
+        cuNTT_LIMBS * sizeof(uint32_t));
 }
 
 void sha256_final(SHA256_CTX ctxs[], uint8_t *out, size_t N) {
-    kernel_sha256_final<<<N, cuNTT_TPB>>>(ctxs, out, N);
+    kernel_sha256_final<<<cuSHA_calc_grid(N), cuSHA_TPB>>>(ctxs, out, N);
 }
 
 }  // namespace cuNTT

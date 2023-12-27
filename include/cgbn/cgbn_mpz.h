@@ -52,8 +52,9 @@ class cgbn_env_t;
 
 template<uint32_t bits>
 struct cgbn_mem_t {
-  public:
-  uint32_t _limbs[(bits+31)/32];
+    constexpr bool operator==(const cgbn_mem_t&) const noexcept = default;
+    
+    uint32_t _limbs[(bits+31)/32];
 };
 
 template<uint32_t tpi, class params=cgbn_default_parameters_t>

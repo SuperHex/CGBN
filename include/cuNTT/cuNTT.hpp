@@ -172,16 +172,23 @@ void memset_mpz(device_mem_t arr[], device_mem_t val, size_t N);
 
 namespace cuSHA {
 
-struct SHA256_CTX {
-	uint8_t data[64];
-	uint32_t datalen;
-	uint64_t bitlen;
-	uint32_t state[8];
+struct sha256_cuda_ctx {
+    uint8_t  *data[64];
+    uint32_t *datalen = nullptr;
+    uint64_t *bitlen = nullptr;
+    uint32_t *state[8];
+    
+	// uint8_t  data[64];
+	// uint32_t datalen;
+	// uint64_t bitlen;
+	// uint32_t state[8];
 };
 
-void sha256_init(SHA256_CTX ctxs[], size_t N);
-void sha256_update(SHA256_CTX ctxs[], const uint8_t *data, size_t N, size_t batch_size);
-void sha256_update(SHA256_CTX ctxs[], const cuNTT::device_mem_t *data, size_t N);
-void sha256_final(SHA256_CTX ctxs[], uint8_t *out, size_t N);
+void sha256_malloc_member(sha256_cuda_ctx *ctx, size_t N);
+void sha256_free_member(sha256_cuda_ctx *ctx);
+void sha256_init(sha256_cuda_ctx *ctxs, size_t N);
+void sha256_update(sha256_cuda_ctx *ctxs, const uint8_t *data, size_t N, size_t batch_size);
+void sha256_update(sha256_cuda_ctx *ctxs, const cuNTT::device_mem_t *data, size_t N);
+void sha256_final(sha256_cuda_ctx *ctxs, uint8_t *out, size_t N);
 
 }  // namespace cuSHA

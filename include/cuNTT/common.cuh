@@ -147,7 +147,38 @@ adjust_inverse(report_error_t *err, device_mem_t *in, device_mem_t gpu_N_inv, in
         // Output is in [0, 2p)
         env.store(&in[instance], x);
     }
- }
+}
+
+__global__ void
+adjust_inverse_reduce(report_error_t *err, device_mem_t *in, device_mem_t gpu_N_inv, int N)
+{
+    context_t ctx(cgbn_report_monitor, err);
+    env_t env(ctx.env<env_t>());
+    
+    num_t x;
+    num_t p, J, N_inv;
+
+    env.load(p, &gpu_p);
+    env.load(J, &gpu_J);
+    env.load(N_inv, &gpu_N_inv);
+    
+    for (int curr_thread = blockDim.x * blockIdx.x + threadIdx.x;
+         curr_thread < N * cuNTT_TPI;
+         curr_thread += blockDim.x * gridDim.x)
+    {
+        const int instance = (blockIdx.y * N) + curr_thread / cuNTT_TPI;
+
+        env.load(x, &in[instance]);
+        montgomery_mul(env, x, x, N_inv, p, J);
+
+        if (env.compare(x, p) >= 0) {
+            env.sub(x, x, p);
+        }
+
+        // Output is in [0, p)
+        env.store(&in[instance], x);
+    }
+}
 
 __global__ void
 precompute_omega_table(report_error_t *err,

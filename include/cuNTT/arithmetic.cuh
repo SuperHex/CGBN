@@ -228,6 +228,38 @@ EltwiseMultMod(device_mem_t *out,
     }
 }
 
+__global__ void
+EltwiseMontMultMod(device_mem_t *out,
+                   const device_mem_t * const __restrict__ x,
+                   device_mem_t adjusted_scalar,
+                   int N)
+{
+    context_t ctx(cgbn_report_monitor);
+    env_t env(ctx.env<env_t>());
+
+    num_t a, s, p, J;
+    env.load(s, &adjusted_scalar);
+    env.load(p, &gpu_p);
+    env.load(J, &gpu_J);
+    
+    for (int curr_thread = blockDim.x * blockIdx.x + threadIdx.x;
+         curr_thread < N * cuNTT_TPI;
+         curr_thread += blockDim.x * gridDim.x)
+    {
+        const int instance = curr_thread / cuNTT_TPI;
+        
+        env.load(a, const_cast<device_mem_t*>(&x[instance]));
+
+        montgomery_mul(env, a, a, s, p, J);
+
+        if (env.compare(a, p) >= 0) {
+            env.sub(a, a, p);
+        }
+
+        env.store(&out[instance], a);
+    }
+}
+
 
 __global__ void
 EltwiseFMAMod(device_mem_t *out,

@@ -83,6 +83,11 @@ void EltwiseMultMod(device_mem_t *out,
                     int N,
                     device_mem_t modulus);
 
+void EltwiseMontMultMod(device_mem_t *out,
+                        const device_mem_t * const __restrict__ x,
+                        device_mem_t adjusted_scalar,
+                        int N);
+
 void EltwiseDivMod(device_mem_t *out,
                    const device_mem_t * const __restrict__ x,
                    const device_mem_t * const __restrict__ y,
@@ -153,6 +158,9 @@ struct ntt_context {
 
     void ComputeInverseRadix4(device_mem_t *out,
                               device_mem_t * const in);
+
+    auto *err() { return err_.get(); }
+    auto *omegas() { return device_omegas_.get(); }
 
 protected:
     size_t degree_;

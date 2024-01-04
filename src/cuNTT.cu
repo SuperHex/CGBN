@@ -150,6 +150,14 @@ void EltwiseMultMod(device_mem_t *out,
     kernel::EltwiseMultMod<<<calc_blocks(N), cuNTT_TPB>>>(out, x, scalar, N, modulus);
 }
 
+void EltwiseMontMultMod(device_mem_t *out,
+                        const device_mem_t * const __restrict__ x,
+                        device_mem_t adjusted_scalar,
+                        int N)
+{
+    kernel::EltwiseMontMultMod<<<calc_blocks(N), cuNTT_TPB>>>(out, x, adjusted_scalar, N);
+}
+
 void EltwiseDivMod(device_mem_t *out,
                    const device_mem_t * const __restrict__ x,
                    const device_mem_t * const __restrict__ y,
@@ -262,14 +270,13 @@ ntt_context::ntt_context(const mpz_class& p, size_t N, const mpz_class& nth_root
 
 void ntt_context::ComputeForwardRadix2(device_mem_t *out, device_mem_t * const in) {
     size_t num_blocks = calc_blocks(degree_), num_parallel = 1;
-    kernel::permute_bit_reversal<2><<<num_blocks, cuNTT_TPB>>> (out, in, degree_, std::log2(degree_));
 
-    
     radix2_fft_forward(err_.get(), out, in,
                        device_omegas_.get(),
                        degree_,
                        dim3(num_blocks, num_parallel),
                        cuNTT_TPB);
+
 }
 
 // NOTE: uncomment 8p to use radix4!
@@ -291,7 +298,6 @@ void ntt_context::ComputeInverseRadix2(device_mem_t *out, device_mem_t * const i
                        degree_,
                        dim3(num_blocks, num_parallel),
                        cuNTT_TPB);
-    kernel::permute_bit_reversal<2><<<num_blocks, cuNTT_TPB>>> (out, out, degree_, std::log2(degree_));
 }
 
 // NOTE: uncomment 8p to use radix4!
